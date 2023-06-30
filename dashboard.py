@@ -1,4 +1,4 @@
-from dash_extensions.enrich import DashProxy, html, dcc, Input, Output, State
+from dash_extensions.enrich import DashProxy, html, dcc, Input, Output, State, Dash
 from dash_extensions import WebSocket
 import pandas as pd
 import json as json
@@ -9,8 +9,10 @@ import db as mydb
 import defaultValue
 import requests
 from tzlocal import get_localzone
+import dash_bootstrap_components as dbc
 
-app = DashProxy(prevent_initial_callbacks=True)
+app = DashProxy(prevent_initial_callbacks=True,
+                external_stylesheets=[dbc.themes.CYBORG])
 
 
 def convertTimeStamp(df, localize=False, convert=False):
@@ -26,10 +28,11 @@ def convertTimeStamp(df, localize=False, convert=False):
     return df
 
 
-def predictionDf(currency, interval):
+def predictionDf(currency, interval, model):
     data = {
         "currency": currency.lower(),
         "interval": interval,
+        "model": model
     }
 
     predictResult = requests.get('http://localhost:3000/predict', json=data, headers={
@@ -38,6 +41,7 @@ def predictionDf(currency, interval):
     })
 
     predictResult = json.loads(predictResult.text)
+
     data = eval(predictResult['data'])
     predictDf = pd.DataFrame(columns=['timestamp', 'Close'])
 
@@ -74,66 +78,79 @@ def predictionDf(currency, interval):
 
 #     return df, data
 
-startDf = mydb.getAll()
+def serve_layout():
 
-startDf = convertTimeStamp(startDf, localize=True)
+    infoReq = requests.get('http://localhost:5000/getServerInfo')
 
+    info = json.loads(infoReq.text)
+    info = info['data']
+
+    defaultSym = info['currency']
+    defaultInterval = info['interval']
+    defaultModel = info['model']
+
+    startDf = mydb.getAll()
+
+    startDf = convertTimeStamp(startDf, localize=True)
+
+    predictDf = predictionDf(defaultValue.defaultSymbol,
+                             defaultValue.intervalVal[defaultValue.defaultInterval], "XGBoost")
 # predictDf = predictionDf(defaultValue.defaultSymbol,
 #                          defaultValue.defaultInterval)
+    return html.Div([
+        html.H1(id="Header"),
+        html.Div([
+            html.Div([
+                html.P(children="Coin symbol", style={
+                    "margin": 0}),
+                dcc.Dropdown(id='currency',
+                             options=[{'label': 'BTC-USDT', 'value': 'BTCUSDT'},
+                                      {'label': 'Etherium', 'value': 'ETHUSDT'}],
+                             multi=False, value=defaultSym.upper(), style={"width": "200px", "display": "flex", "margin": "0 10px 0 10px", "jusifyContent": "center"}, clearable=False)
+            ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px"}),
+            html.Div([
+                html.P(children="Model", style={
+                    "margin": 0}),
+                dcc.Dropdown(id='model',
+                             options=[{'label': 'XGBoost', 'value': 'XGBoost'},
+                                      {'label': 'RNN', 'value': 'RNN'},
+                                      {'label': 'LSTM', 'value': 'LSTM'}],
+                             multi=False, value=defaultModel, style={"width": "200px", "display": "flex", "alignItems": "center", "margin": "0 10px 0 10px"}, clearable=False)
+            ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px"}),
+            html.Div([
+                html.P(children="Interval", style={
+                    "margin": 0}),
+                dcc.Dropdown(id='interval',
+                             options=[{'label': '1m', 'value': '1m'},
+                                      {'label': '5m', 'value': '5m'},
+                                      {'label': '30m', 'value': '30m'},
+                                      {'label': '1h', 'value': '1h'}],
+                             multi=False, value=defaultInterval, style={"width": "200px", "display": "flex", "alignItems": "center", "margin": "0 10px 0 10px"}, clearable=False)
+            ], style={"display": "flex", "alignItems": "center",  "marginBottom": "10px"}),
+            html.Div([
+                html.P(children="Target", style={
+                    "margin": 0}),
+                dcc.Dropdown(id='based',
+                             options=[{'label': 'Close', 'value': 'C'},
+                                      {'label': 'ROC', 'value': 'ROC'}],
+                             multi=True, value=['C', 'ROC'], style={"width": "200px", "display": "flex", "alignItems": "center", "textAlign": "right", "margin": "0 10px 0 10px"}, clearable=False)
+            ], style={"display": "flex", "alignItems": "center",  "marginBottom": "10px"})
+        ], style={"display": "flex", "margin": "auto", "width": "100%", "alignItems": "center", "justifyContent": "space-evenly", "flexWrap": "wrap", "marginBottom": "20px"}),
+        dcc.Graph(id="candles", figure=go.Figure(data=[
+            go.Candlestick(x=startDf.timestamp, open=startDf.Open,
+                           high=startDf.High, low=startDf.Low, close=startDf.Close, name="Readtime data"),
+            go.Scatter(x=predictDf.timestamp, y=predictDf.Close, name="Model prediction")], layout=dict(template='plotly_dark')
+        )),
+        # dcc.Store(id='graphdata', data=startData),
+        # WebSocket(
+        #     id="ws", url=f'wss://stream.binance.us:9443/ws/{defaultValue.defaultSymbol.lower()}@kline_{defaultValue.defaultInterval}'),
+        dcc.Interval(id="intervalCounter",
+                     interval=defaultValue.intervalVal[defaultInterval])
+    ])
 
-app.layout = html.Div([
-    html.H1(id="Header"),
-    html.Div([
-        html.Div([
-            html.P(children="Coin symbol", style={
-                   "marginLeft": "20px", "width": "70px"}),
-            dcc.Dropdown(id='currency',
-                         options=[{'label': 'BTC-USDT', 'value': 'BTCUSDT'},
-                                  {'label': 'Etherium', 'value': 'ETHUSDT'}],
-                         multi=False, value='BTCUSDT', style={"width": "200px", "display": "flex", "alignItems": "center", "margin": "0 10px 0 10px"}, clearable=False)
-        ], style={"display": "flex"}),
-        html.Div([
-            html.P(children="Prediction model", style={
-                   "marginLeft": "20px", "width": "70px"}),
-            dcc.Dropdown(id='model',
-                         options=[{'label': 'XGBoost', 'value': 'XGB'},
-                                  {'label': 'RNN', 'value': 'RNN'},
-                                  {'label': 'LSTM', 'value': 'LSTM'}],
-                         multi=False, value='XGB', style={"width": "200px", "display": "flex", "alignItems": "center", "margin": "0 10px 0 10px"}, clearable=False)
-        ], style={"display": "flex"}),
-        html.Div([
-            html.P(children="Interval", style={
-                 "marginLeft": "20px", "width": "70px"}),
-            dcc.Dropdown(id='interval',
-                         options=[{'label': '1m', 'value': '1m'},
-                                  {'label': '5m', 'value': '5m'},
-                                  {'label': '30m', 'value': '30m'},
-                                  {'label': '1h', 'value': '1h'}],
-                         multi=False, value='1m', style={"width": "200px", "display": "flex", "alignItems": "center", "margin": "0 10px 0 10px"}, clearable=False)
-        ], style={"display": "flex"}),
-        html.Div([
-            html.P(children="Based on", style={
-                   "marginLeft": "20px", "width": "70px"}),
-            dcc.Dropdown(id='based',
-                         options=[{'label': 'Close', 'value': 'C'},
-                                  {'label': 'ROC', 'value': 'ROC'}],
-                         multi=True, value=['C', 'ROC'], style={"width": "200px", "display": "flex", "alignItems": "center", "textAlign": "right", "margin": "0 10px 0 10px"}, clearable=False)
-        ], style={"display": "flex"})
-    ], style={"display": "flex", "margin-left": "auto",
-              "margin-right": "auto", "width": "100%", "align-items": "center", "justify-content": "center", "flexWrap": "wrap"}),
-    dcc.Graph(id="candles", figure=go.Figure(data=[
-        go.Candlestick(x=startDf.timestamp, open=startDf.Open,
-                       high=startDf.High, low=startDf.Low, close=startDf.Close)])),
-    # dcc.Store(id='graphdata', data=startData),
-    # WebSocket(
-    #     id="ws", url=f'wss://stream.binance.us:9443/ws/{defaultValue.defaultSymbol.lower()}@kline_{defaultValue.defaultInterval}'),
-    dcc.Interval(id="intervalCounter",
-                 interval=defaultValue.intervalVal[defaultValue.defaultInterval])
-])
 
-
-@app.callback(Output("candles", "figure", allow_duplicate=True), Input("intervalCounter", "n_intervals"), Input("intervalCounter", "interval"), Input("currency", "value"))
-def update_figure(n_intervals, interval, currency):
+@app.callback(Output("candles", "figure", allow_duplicate=True), Input("intervalCounter", "n_intervals"), Input("intervalCounter", "interval"), Input("currency", "value"), Input('model', 'value'))
+def update_figure(n_intervals, interval, currency, model):
     data_df = mydb.getAll()
     # if (message == None):
     #     raise PreventUpdate("WS update")
@@ -163,25 +180,26 @@ def update_figure(n_intervals, interval, currency):
     #     else:
     #         data_df = df
 
-    predictDf = predictionDf(currency, interval)
+    predictDf = predictionDf(currency, interval, model)
 
     display_df = data_df.copy(deep=True)
     display_df = convertTimeStamp(display_df, localize=True, convert=False)
 
     candles = go.Figure(data=[
         go.Candlestick(x=display_df.timestamp, open=display_df.Open,
-                       high=display_df.High, low=display_df.Low, close=display_df.Close),
-        go.Scatter(x=predictDf.timestamp, y=predictDf.Close)])
-    candles.update_layout(uirevision="Don't change")
+                       high=display_df.High, low=display_df.Low, close=display_df.Close, name="Realtime data"),
+        go.Scatter(x=predictDf.timestamp, y=predictDf.Close, name="Model prediction")])
+    candles.update_layout(uirevision="Don't change", template="plotly_dark")
 
     return candles
 
 
-@app.callback(Output("candles", "figure", allow_duplicate=True), Output("intervalCounter", "interval"), Input("currency", "value"), Input("interval", "value"))
-def update_firgure(currency, interval):
+@app.callback(Output("intervalCounter", "interval"), Input("currency", "value"), Input("interval", "value"), Input('model', 'value'))
+def update_firgure(currency, interval, model):
     data = {
         "currency": currency.lower(),
         "interval": interval,
+        "model": model
     }
 
     updateSocket = requests.post('http://localhost:5000/updateSocket', json=data, headers={
@@ -194,14 +212,15 @@ def update_firgure(currency, interval):
     display_df = data_df.copy(deep=True)
     display_df = convertTimeStamp(display_df, localize=True, convert=False)
 
-    candles = go.Figure(data=[
-        go.Candlestick(x=display_df.timestamp, open=display_df.Open,
-                       high=display_df.High, low=display_df.Low, close=display_df.Close),
-    ])
-    candles.update_layout(uirevision="Don't change")
+    # candles = go.Figure(data=[
+    #     go.Candlestick(x=display_df.timestamp, open=display_df.Open,
+    #                    high=display_df.High, low=display_df.Low, close=display_df.Close),
+    # ])
+    # candles.update_layout(uirevision="Don't change", template="plotly_dark")
 
-    return candles, defaultValue.intervalVal[f"{interval}"]
+    return defaultValue.intervalVal[f"{interval}"]
 
 
+app.layout = serve_layout()
 if __name__ == '__main__':
     app.run_server(debug=True)

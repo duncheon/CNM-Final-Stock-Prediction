@@ -7,7 +7,7 @@ import defaultValue
 
 currency = defaultValue.defaultSymbol
 interval = defaultValue.defaultInterval
-
+model = "XGBoost"
 # create a restart flag
 streamingFlag = False
 isKilled = False
@@ -109,12 +109,28 @@ def start_flask_app():
     api.run()
 
 
+@api.route('/getServerInfo', methods=["GET"])
+def get_info():
+    global currency
+    global interval
+    global model
+
+    data = {"currency": currency.upper(), "interval": interval, "model": model}
+
+    return jsonify({
+        'msg': f'Current state {currency} + {interval} + {model}',
+        'status': 200,
+        'data': data
+    })
+
+
 @api.route('/updateSocket', methods=["POST"])
 def update_socket():
     body = request.get_json()
     print(body)
     global currency
     global interval
+    global model
     global streamingFlag
 
     if (currency == body["currency"] and interval == body["interval"]) is False:
