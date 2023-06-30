@@ -1,7 +1,10 @@
 ## References:
 
-### - [Tutorial](https://data-flair.training/blogs/stock-price-prediction-machine-learning-project-in-python/?fbclid=IwAR3qpJJqdY0dEcMLUGWqKRL_I6EGWRv_U6IZZ03G5X2bvY7SwnBBsS_0JcI)
-
+### - [LSTM](https://data-flair.training/blogs/stock-price-prediction-machine-learning-project-in-python/?fbclid=IwAR3qpJJqdY0dEcMLUGWqKRL_I6EGWRv_U6IZZ03G5X2bvY7SwnBBsS_0JcI)
+### - [XGBoost](https://www.youtube.com/watch?v=z3ZnOW-S550&t=1164s)
+### - RNN Close implementation with LSTM + SimpleRNN tensorflow documentations
+### - [Dashboard tutorial](https://www.youtube.com/watch?v=2pdJX1kYvR4)
+### - Subject's slides and documents
 ## Binance API Documentation
 
 - [kline-data](https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data)
