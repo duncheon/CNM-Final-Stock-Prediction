@@ -7,11 +7,14 @@ import db
 from keras.models import Sequential
 from keras.layers import LSTM, Dropout, Dense
 from sklearn.preprocessing import MinMaxScaler
+import defaultValue
 
 
 def LSTMModel(symbol, interval):
-    df = pd.DataFrame.from_dict(db.fetchFirstCandles(symbol, '1m', 1000))
+    df = pd.DataFrame.from_dict(db.fetchFirstCandles(
+        symbol, interval, defaultValue.trainCandlesSize))
     # df = db.getRecent(1000)
+    # df = df.drop('ID', axis=1)
 
     df['timestamp'] = df['timestamp'].astype('int64')
     df['timestamp'] = df['timestamp'].div(1000)
@@ -22,7 +25,6 @@ def LSTMModel(symbol, interval):
         0, len(df)), columns=['timestamp', 'Close'])
 
     for i in range(0, len(data)):
-        print(data['timestamp'])
         new_dataset["timestamp"][i] = data['timestamp'][i]
         new_dataset["Close"][i] = data["Close"][i]
 
@@ -32,7 +34,7 @@ def LSTMModel(symbol, interval):
 
     final_dataset = new_dataset.values
 
-    train_data = final_dataset[0:999, :]
+    train_data = final_dataset[0: defaultValue.trainCandlesSize - 1, :]
     # val_data = final_dataset[749, 999]
 
     scaler = MinMaxScaler(feature_range=(0, 1))
@@ -57,15 +59,18 @@ def LSTMModel(symbol, interval):
 
     lstm_model.compile(loss='mean_squared_error', optimizer='adam')
     lstm_model.fit(x_train_data, y_train_data,
-                   epochs=1, batch_size=1, verbose=2)
+                   epochs=1, batch_size=32, verbose=2)
 
-    lstm_model.save("lstm_" + symbol + ".h5")
-
+    lstm_model.save("./models/lstm_" + symbol.lower() + f"_{interval}" + ".h5")
+    # model = lstm_model
     # plt.plot(valid_data[['Close', "Predictions"]])
 
 
-def prediction(model, interval, total):
+def prediction(symbol, interval, total):
+    # df = pd.DataFrame.from_dict(db.fetchFirstCandles(symbol, '1m', 1000))
+    intervalKey = defaultValue.getIntervalKey(interval)
     df = db.getRecent(1000)
+    df = df.drop('ID', axis=1)
 
     df['timestamp'] = df['timestamp'].astype('int64')
     lastTimestamp = df["timestamp"].iloc[-1]
@@ -105,7 +110,7 @@ def prediction(model, interval, total):
     # x_train, y_train = np.array(x_train), np.array(y_train)
     # x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
 
-    loaded_model = load_model('lstm_btcusdt.h5')
+    loaded_model = load_model(f'./models/lstm_{symbol}_{intervalKey}.h5')
 
     inputs = new_data[len(new_data)-total-60:].values
     inputs = inputs.reshape(-1, 1)
@@ -126,9 +131,8 @@ def prediction(model, interval, total):
 
     valid['Predictions'] = closing_price
 
-    print(valid['Predictions'])
     return valid
 
 
-# LSTMModel("btcusdt", 60000)
-prediction('btcusdt', 60000, 50)
+# LSTMModel("btcusdt")
+# prediction('btcusdt', 60000, 1000)

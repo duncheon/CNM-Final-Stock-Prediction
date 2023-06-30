@@ -21,24 +21,26 @@ def createFeature(df):
 
 
 def XGBoost(symbol, interval, total):
-    # df = pd.DataFrame.from_dict(db.fetchFirstCandles(symbol, interval, 1000))
-    df = db.getRecent(1000)
-    df = df.drop('ID', axis=1)
+    df = pd.DataFrame.from_dict(db.fetchFirstCandles(
+        symbol, defaultValue.getIntervalKey(interval), defaultValue.trainCandlesSize))
+    # df = db.getRecent(1000)
+    # df = df.drop('ID', axis=1)
 
     lastTimestamp = df["timestamp"].iloc[-1]
     for x in range(1, total + 1):
-        df.loc[len(df.index)] = [0, 0, 0, 0, 0, symbol.upper(),
-                                 lastTimestamp + x * interval, ]
+        df.loc[len(df.index)] = [0, 0, 0, 0, 0,
+                                 lastTimestamp + x * interval, symbol.upper()]
 
+    df.index = df['timestamp']
     df['timestamp'] = df['timestamp'].astype('int64')
     df['timestamp'] = df['timestamp'].div(1000)
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit="s", utc=False)
 
     # df.index = df.timestamp
 
-    train = df.loc[df.index < 750]
-    test = df.loc[750: 999]
-    pred = df.loc[df.index > 999]
+    train = df[0:defaultValue.trainSplitSize - 1]
+    test = df[defaultValue.trainSplitSize:defaultValue.trainCandlesSize - 1]
+    pred = df[defaultValue.trainCandlesSize:]
 
     pred = createFeature(pred)
     train = createFeature(train)
@@ -56,17 +58,13 @@ def XGBoost(symbol, interval, total):
 
     x_pred = pred[features]
     reg = xgb.XGBRegressor(
-        n_estimators=1000, early_stopping_rounds=50, learning_rate=0.5)
+        n_estimators=1000, early_stopping_rounds=10, learning_rate=0.7)
     reg.fit(X_train, y_train, eval_set=[
             (X_train, y_train), (X_test, y_test)], verbose=True)
 
     x_pred['Predictions'] = reg.predict(x_pred)
-    print(x_pred['Predictions'])
-    return x_pred['Predictions']
 
-
-def prediction(df, model, interval):
-    print('predict')
+    return x_pred
 
 
 # LSTMModel('btcusdt')
@@ -74,4 +72,4 @@ def prediction(df, model, interval):
 # print(valid)
 # predictionModel("./BTC-USD.csv", "btc")
 # predictionModel("./ETH-USD.csv", "eth")
-XGBoost('btcusdt', 60000, 100)
+# XGBoost('btcusdt', 60000, 100)

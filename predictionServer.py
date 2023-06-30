@@ -14,6 +14,7 @@ from flask import Flask, json, request, jsonify
 import defaultValue
 import xgboostModel
 import LSTMModel
+import RNNModel
 
 scaler = MinMaxScaler(feature_range=(0, 1))
 
@@ -29,7 +30,15 @@ api = Flask(__name__)
 
 def prepareAllModel():
     print("Model prep")
-    # LSTMModel('btcusdt')
+    for symbol in defaultValue.currencyList:
+        for interval in defaultValue.intervalKey:
+            RNNModel.RNNmodel(symbol, interval)
+    for symbol in defaultValue.currencyList:
+        for interval in defaultValue.intervalKey:
+            LSTMModel.LSTMModel(symbol, interval)
+    # for symbol in defaultValue.currencyList:
+    #     for interval in defaultValue.intervalKey:
+    #         xgboostModel.XGBoost(symbol, interval)
 
 
 @api.route('/predict', methods=["GET"])
@@ -38,18 +47,23 @@ def update_socket():
     model = body["model"]
     inputInterval = body["interval"]
     currency = body["currency"]
-    total = body["total"]
+    total = 500
+    # total = body["total"]
 
     if (inputInterval and currency):
         data = db.getRecent(1000)
 
         valid = []
-        if model is 'XGBoost':
-            # valid = xgboostModel.XGBoost(currency, inputInterval, 10)
-            valid = []
+        if model == 'XGBoost':
+            valid = xgboostModel.XGBoost(currency, inputInterval, total)
+            # print(valid['Predictions'])
+        elif model == 'LSTM':
+            # LSTMModel.LSTMModel(currency)
+            valid = LSTMModel.prediction(currency, inputInterval, total)
+            # print(valid['Predictions'])
         else:
-            # valid = prediction(data, 'lstm_btcusdt.h5', inputInterval)
-            valid = []
+            # RNNModel.RNNmodel(currency)
+            valid = RNNModel.prediction(currency, inputInterval, total)
         returnData = valid['Predictions'].to_json()
         return jsonify({
             'msg': f'Prediction returned',
