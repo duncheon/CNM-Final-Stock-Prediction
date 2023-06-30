@@ -78,5 +78,5 @@ def update_socket():
 
 
 if __name__ == '__main__':
-    # prepareAllModel()
+    prepareAllModel()
     api.run(port=3000)

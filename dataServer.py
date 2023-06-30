@@ -127,7 +127,7 @@ def get_info():
 @api.route('/updateSocket', methods=["POST"])
 def update_socket():
     body = request.get_json()
-    print(body)
+
     global currency
     global interval
     global model

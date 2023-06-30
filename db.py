@@ -11,7 +11,6 @@ def fetchFirstCandles(symbol, interval, limit):
     data = data.json()
     formatedData = []
 
-    print(data)
     for candle in data:
         candleObj = {}
         candleObj["Open"] = candle[1]
