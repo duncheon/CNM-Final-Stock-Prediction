@@ -5,7 +5,7 @@
 ## Binance API Documentation
 
 - [kline-data](https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data)
-- [kline-stream](ttps://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-streams)
+- [kline-stream](https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-streams)
 
 ## How to run:
 
